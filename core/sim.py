@@ -20,23 +20,24 @@ class StrategySet:
     break_day: np.ndarray  # (n,) first day the true mean is <= 0; N_DAYS if never
 
 
-def simulate(n: int, seed: int) -> StrategySet:
+def simulate(n: int, seed: int, mu: float = MU, scale: float = SCALE, nu: float = NU) -> StrategySet:
+    """Healthy mean `mu` (> 0), Student-t noise with `scale` and `nu`; breaks flip the mean to -mu."""
     rng = np.random.default_rng(seed)
     kind = np.array([KINDS[i * 3 // n] for i in range(n)])
-    mean = np.full((n, N_DAYS), MU)
+    mean = np.full((n, N_DAYS), mu)
     break_day = np.full(n, N_DAYS)
     days = np.arange(N_DAYS)
     for i in range(n):
         if kind[i] == "sudden":
             b = rng.integers(WARMUP + 10, N_DAYS - 10)
-            mean[i, b:] = -MU
+            mean[i, b:] = -mu
             break_day[i] = b
         elif kind[i] == "decay":
             start = rng.integers(WARMUP + 10, N_DAYS - DECAY_DAYS)
             frac = np.clip((days - start) / DECAY_DAYS, 0.0, 1.0)
-            mean[i] = MU - 2 * MU * frac
+            mean[i] = mu - 2 * mu * frac
             break_day[i] = start + DECAY_DAYS // 2  # mean crosses zero halfway
-    returns = mean + SCALE * rng.standard_t(NU, size=(n, N_DAYS))
+    returns = mean + scale * rng.standard_t(nu, size=(n, N_DAYS))
     return StrategySet(returns=returns, mean=mean, kind=kind, break_day=break_day)
 
 

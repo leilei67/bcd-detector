@@ -44,3 +44,12 @@ def test_decay_slides_over_120_days_and_break_is_zero_crossing():
     assert m[b - 1] > 0 >= m[b]
     assert np.allclose(m[start + 120 :], -MU)
     assert np.allclose(np.diff(m[start : start + 121]), -2 * MU / 120)
+
+
+def test_simulate_uses_given_parameters():
+    s = simulate(30, seed=1, mu=0.003, scale=0.02, nu=6.0)
+    h = s.kind == "healthy"
+    assert np.allclose(s.mean[h], 0.003)
+    assert np.allclose(s.mean[s.kind == "sudden"][:, -1], -0.003)
+    noise = (s.returns - s.mean)[h].ravel()
+    assert abs(noise.std() - 0.02 * np.sqrt(6 / 4)) < 0.002
