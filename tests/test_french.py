@@ -7,7 +7,7 @@ Missing data are indicated by -99.99 or -999.
 
 ,Mkt-RF,SMB,HML,RF
 20200102,    0.45,   -0.34,   -0.03,    0.01
-20200103,   -1.20,    0.10,    0.50,    0.01
+20200103,   -1.20,    0.10,    0.50,    -999
 20200106,    0.30,   -99.99,    0.25,    0.01
 20200107,    0.10,    0.20,    0.05,    0.01
 
@@ -54,3 +54,22 @@ def test_too_little_history_fails_loudly():
     dates, values = parse_french_csv(SAMPLE, "HML")
     with pytest.raises(ValueError, match="only 4"):
         select_window(dates, values, end=None, days=10)
+
+
+def test_both_missing_markers_are_caught():
+    dates, values = parse_french_csv(SAMPLE, "RF")  # -999 on 2020-01-03
+    assert values[1] is None
+    with pytest.raises(ValueError, match="missing"):
+        select_window(dates, values, end="2020-01-03", days=2)
+
+
+def test_end_after_the_data_fails_instead_of_silently_moving_the_window():
+    dates, values = parse_french_csv(SAMPLE, "HML")
+    with pytest.raises(ValueError, match="2029-12-31"):
+        select_window(dates, values, end="2029-12-31", days=2)
+
+
+def test_malformed_end_date_fails():
+    dates, values = parse_french_csv(SAMPLE, "HML")
+    with pytest.raises(ValueError):
+        select_window(dates, values, end="2020-1-5", days=2)

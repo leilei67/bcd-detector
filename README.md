@@ -145,7 +145,7 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
 - **Simulation horizon.** The simulated strategies are as long as the series being judged, with a minimum of 380 days, which leaves room for a 120-day decay after the warm-up. That way the thresholds suit how long the strategy has been live. A long upload (say 10 years) therefore takes proportionally longer to analyse.
 - **Real-data windows.** As above: one rule, with each reason in `core/datasets.py`. The episodes were checked in the data before they were bundled:
   - Momentum's −14.4 % on 2020-11-09 is its worst day of 2020.
-  - Value fell 10.6 % in 2018, 8.3 % in 2019 and 33 % in 2020 (sums of daily returns).
+  - Value fell 11.0 % in 2018, 8.3 % in 2019 and 33 % in 2020 (calendar-year sums of daily returns).
 - **Datasets with no edge are kept.** Value 2018–2020 and Value latest show "No recommendation" rather than having their windows moved.
 - **"US market" means Mkt-RF,** the excess return over T-bills, not the total return.
 - **Default "as of" day.** Day 540 for the simulated demo, so the risk slider visibly flips the recommendation. The last day for real and uploaded data.
@@ -180,9 +180,10 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
 
 ## Review notes
 
-Two two-axis reviews (standards and spec) ran:
+Three two-axis reviews (standards and spec) ran:
 - the first against the `start` commit;
-- the second against the end of the simulated-only build (`19ec1b6`).
+- the second against the end of the simulated-only build (`19ec1b6`);
+- the third against the commit before the French-factor datasets (`232e1a6`).
 
 **Fixed, because they made a shown number wrong or broke the demo:**
 - **Calibration.** The calibration p series ran through the warm-up instead of starting at 0 on day 250. Regression test in `tests/test_evaluate.py`.
@@ -191,6 +192,9 @@ Two two-axis reviews (standards and spec) ran:
 - **Simulation horizon.** Uploads of any length were tuned on 750-day simulations, so a long series got thresholds for the wrong horizon. Simulations now match the series length. Regression test in `tests/test_pipeline.py`.
 - **Second upload.** Uploading a shorter file after a longer one kept the old "as of" day and crashed the page. Each upload now resets the page state.
 - **Date errors.** A file with both duplicate and unsorted dates now reports both problems.
+- **Window end dates.** A mistyped or future end date used to write a different window without complaint, while the caption still named the requested date. `select_window` now parses the date and fails if the data stops more than a week before it. Missing-data markers become `None`, not numbers, and both markers (−99.99, −999) are tested.
+- **Captions.** They called every warm-up "healthy", which contradicted the no-edge warning on the two value datasets. They now say it is the period the tool learns "normal" from.
+- **Value 2018 figure.** The README said value fell 10.6 % in 2018. That figure covered only the part of 2018 inside the window; the calendar-year figure is 11.0 %.
 - **Worker retry.** The Pyodide worker now retries loading Python only when loading itself failed. Previously, any later JavaScript error forced a fresh 30 MB download.
 
 **Deferred, because nothing is wrong today but a later edit could make it wrong:**
@@ -203,4 +207,7 @@ Two two-axis reviews (standards and spec) ran:
 - **Page components.** `Demo` and `Live` in `App.jsx` share a render function rather than a component. Captions are built in both `run.py` and `analyse_csv`.
 - **Python decision rule.** `core/actions.py` is only exercised by tests; the browser copy in `logic.js` is what runs, with the same test cases.
 - **Percent check.** It is one heuristic (median |r| > 5 %). A very volatile decimal series would be rejected, and a calm series in percent would pass. Gaps between trading days are not flagged.
+- **Dataset plumbing.**
+  - The `data/<id>.csv` path is built in both `core/run.py` and `scripts/fetch_data.py`.
+  - Group labels are typed in `core/datasets.py`, `core/run.py` and `App.jsx`. A typo would create a new picker row without any error.
 - **Multiple comparison.** The three Bayesian hazard rows on the test board are a mild multiple comparison. The verdict uses only the default 2y row.

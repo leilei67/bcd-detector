@@ -1,4 +1,4 @@
-"""Bundled real datasets: one fixed rule (750 trading days ending on a stated date), one reason each.
+"""Bundled real datasets: one fixed rule (WINDOW_DAYS trading days ending on a stated date), one reason each.
 
 `scripts/fetch_data.py` downloads and writes data/<id>.csv; `python -m core.run` analyses them.
 """
@@ -13,7 +13,7 @@ FACTORS = {
     "HML": "Kenneth French's daily value factor (long cheap stocks by book-to-market, short expensive ones)",
     "Mkt-RF": "Kenneth French's daily US stock market return above the one-month T-bill rate",
 }
-NOW_REASON = "the latest 750 trading days in the source file, so no hindsight went into choosing it."
+NOW_REASON = f"the latest {WINDOW_DAYS} trading days in the source file, so no hindsight went into choosing it."
 
 REAL = [
     {"id": "umd_2009", "group": "Historical episodes", "name": "Momentum: 2009 crash",

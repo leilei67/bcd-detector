@@ -17,7 +17,7 @@ OUT = ROOT / "web" / "public" / "datasets"
 def caption(ds, dates):
     when = "ending at the latest date in the source file" if ds["end"] is None else f"ending {ds['end']}"
     return (f"{FACTORS[ds['column']]}. Window: the {WINDOW_DAYS} trading days {when} ({dates[0]} to {dates[-1]}); "
-            f"the first {WARMUP} (to {dates[WARMUP - 1]}) are the healthy warm-up. Why this window: {ds['reason']} "
+            f"the first {WARMUP} (to {dates[WARMUP - 1]}) are the warm-up the tool learns 'normal' from. Why this window: {ds['reason']} "
             "Same rule for every real dataset. Thresholds were tuned on strategies simulated from the warm-up fit, "
             "never on these returns. Source: Kenneth R. French Data Library.")
 
