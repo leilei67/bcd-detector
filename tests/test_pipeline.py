@@ -35,3 +35,9 @@ def test_no_edge_in_warmup_gives_warning_not_recommendation():
 
 def test_csv_errors_come_back_as_messages():
     assert "at least 310" in " ".join(analyse_csv("date,return\n2020-01-01,0.01\n")["errors"])
+
+
+def test_long_series_is_tuned_on_simulations_of_the_same_length():
+    r = np.concatenate([demo_strategy(), demo_strategy()[250:]])  # 1250 days
+    res = analyse(r, n=N)
+    assert res["config"]["sim_days"] == 1250 and res["config"]["n_days"] == 1250

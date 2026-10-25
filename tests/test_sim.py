@@ -53,3 +53,10 @@ def test_simulate_uses_given_parameters():
     assert np.allclose(s.mean[s.kind == "sudden"][:, -1], -0.003)
     noise = (s.returns - s.mean)[h].ravel()
     assert abs(noise.std() - 0.02 * np.sqrt(6 / 4)) < 0.002
+
+
+def test_simulation_length_can_match_a_long_series():
+    s = simulate(30, seed=1, n_days=1000)
+    assert s.returns.shape == (30, 1000)
+    broken = s.break_day[s.kind != "healthy"]
+    assert broken.max() < 1000 and (s.break_day[s.kind == "healthy"] == 1000).all()

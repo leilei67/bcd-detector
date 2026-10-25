@@ -64,7 +64,7 @@ def parse_returns_csv(text: str):
         seen.add(d)
     if dupes:
         messages.append(f"Duplicate dates: {', '.join(dupes[:MAX_LISTED])}" + (" …" if len(dupes) > MAX_LISTED else ""))
-    elif any(b < a for a, b in zip(dates, dates[1:])):
+    if any(b < a for a, b in zip(dates, dates[1:])):
         first = next(i for i, (a, b) in enumerate(zip(dates, dates[1:])) if b < a)
         messages.append(f"Dates are not in increasing order (first at {dates[first + 1].isoformat()}). Sort the file by date.")
     if messages:

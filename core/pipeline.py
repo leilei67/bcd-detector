@@ -12,7 +12,7 @@ from core.data import CsvError, parse_returns_csv
 from core.detectors import Bayes, Cusum, Drawdown, run_series
 from core.evaluate import REDEPLOY, calibration, run_kill_rule, score, tune
 from core.model import K_BROKEN, Baseline, fit_baseline, fit_baselines, log_likelihood_ratio
-from core.sim import N_DAYS, WARMUP, simulate
+from core.sim import MIN_SIM_DAYS, WARMUP, simulate
 
 HAZARD_YEARS = (1, 2, 5)
 DEFAULT_HAZARD = 2
@@ -25,9 +25,9 @@ LABELS = {**{f"bayes_{y}y": f"Bayesian (hazard {y}y)" for y in HAZARD_YEARS},
           "cusum": "CUSUM", "drawdown": "Drawdown depth", "never": "Never kill"}
 
 
-def prepare(n, seed, sim_params):
+def prepare(n, seed, sim_params, n_days):
     mu, scale, nu = sim_params
-    s = simulate(n, seed, mu=mu, scale=scale, nu=nu)
+    s = simulate(n, seed, mu=mu, scale=scale, nu=nu, n_days=n_days)
     mus, sigmas, nus = fit_baselines(s.returns[:, :WARMUP])
     llr = np.array([log_likelihood_ratio(r, Baseline(*b)) for r, b in zip(s.returns, zip(mus, sigmas, nus))])
     return s, llr, sigmas
@@ -60,11 +60,13 @@ def analyse(returns, dates=None, *, sim_params=None, name="Uploaded strategy", c
     base = fit_baseline(r[:WARMUP])
     resimulated = sim_params is None
     sim_params = (base.mu, base.sigma, base.nu) if resimulated else tuple(sim_params)
+    # Simulate the same horizon as the series, so thresholds suit how long it has been live.
+    sim_days = max(len(r), MIN_SIM_DAYS)
     results = {
         "dataset": {"name": name, "caption": caption, "resimulated": resimulated,
                     "sim_params": [float(v) for v in sim_params]},
         "config": {"k_broken": K_BROKEN, "redeploy_days": REDEPLOY, "warmup": WARMUP, "n_days": len(r),
-                   "sim_days": N_DAYS, "hazard_years": list(HAZARD_YEARS), "default_hazard": DEFAULT_HAZARD,
+                   "sim_days": sim_days, "hazard_years": list(HAZARD_YEARS), "default_hazard": DEFAULT_HAZARD,
                    "train": {"n": n, "seed": TRAIN_SEED}, "test": {"n": n, "seed": TEST_SEED},
                    "default_day": default_day if default_day is not None else len(r) - 1},
         "demo": {"break_day": break_day, "warmup": WARMUP, "returns": r.tolist(), "dates": dates,
@@ -78,8 +80,8 @@ def analyse(returns, dates=None, *, sim_params=None, name="Uploaded strategy", c
             "'Broken' would look the same as 'healthy', so the detectors cannot judge this strategy.")
         return results
 
-    train, train_llr, train_sigma = prepare(n, TRAIN_SEED, sim_params)
-    test, test_llr, test_sigma = prepare(n, TEST_SEED, sim_params)
+    train, train_llr, train_sigma = prepare(n, TRAIN_SEED, sim_params, sim_days)
+    test, test_llr, test_sigma = prepare(n, TEST_SEED, sim_params, sim_days)
 
     tuned, train_regret = {}, {}
     for key, det in detectors(train_sigma).items():

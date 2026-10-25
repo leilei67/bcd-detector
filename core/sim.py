@@ -10,6 +10,7 @@ SCALE = 0.008  # Student-t scale (daily std = SCALE * sqrt(NU / (NU - 2)))
 NU = 4.0
 DECAY_DAYS = 120
 KINDS = ("healthy", "sudden", "decay")
+MIN_SIM_DAYS = WARMUP + DECAY_DAYS + 20  # room for a decay to start and finish after the warm-up
 
 
 @dataclass(frozen=True)
@@ -20,24 +21,28 @@ class StrategySet:
     break_day: np.ndarray  # (n,) first day the true mean is <= 0; N_DAYS if never
 
 
-def simulate(n: int, seed: int, mu: float = MU, scale: float = SCALE, nu: float = NU) -> StrategySet:
-    """Healthy mean `mu` (> 0), Student-t noise with `scale` and `nu`; breaks flip the mean to -mu."""
+def simulate(n: int, seed: int, mu: float = MU, scale: float = SCALE, nu: float = NU,
+             n_days: int = N_DAYS) -> StrategySet:
+    """Healthy mean `mu` (> 0), Student-t noise with `scale` and `nu`; breaks flip the mean to -mu.
+
+    n_days must leave room for a decay after the warm-up (>= MIN_SIM_DAYS).
+    """
     rng = np.random.default_rng(seed)
     kind = np.array([KINDS[i * 3 // n] for i in range(n)])
-    mean = np.full((n, N_DAYS), mu)
-    break_day = np.full(n, N_DAYS)
-    days = np.arange(N_DAYS)
+    mean = np.full((n, n_days), mu)
+    break_day = np.full(n, n_days)
+    days = np.arange(n_days)
     for i in range(n):
         if kind[i] == "sudden":
-            b = rng.integers(WARMUP + 10, N_DAYS - 10)
+            b = rng.integers(WARMUP + 10, n_days - 10)
             mean[i, b:] = -mu
             break_day[i] = b
         elif kind[i] == "decay":
-            start = rng.integers(WARMUP + 10, N_DAYS - DECAY_DAYS)
+            start = rng.integers(WARMUP + 10, n_days - DECAY_DAYS)
             frac = np.clip((days - start) / DECAY_DAYS, 0.0, 1.0)
             mean[i] = mu - 2 * mu * frac
             break_day[i] = start + DECAY_DAYS // 2  # mean crosses zero halfway
-    returns = mean + scale * rng.standard_t(nu, size=(n, N_DAYS))
+    returns = mean + scale * rng.standard_t(nu, size=(n, n_days))
     return StrategySet(returns=returns, mean=mean, kind=kind, break_day=break_day)
 
 

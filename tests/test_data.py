@@ -64,3 +64,11 @@ def test_all_problems_reported_together():
     rows[3] = "2010-01-04,x"
     msg = errors_for(csv(rows))
     assert "line 5" in msg and "at least 310" in msg and "percent" in msg
+
+
+def test_duplicate_and_unsorted_both_reported():
+    rows = days(310)
+    rows[20] = rows[19]
+    rows[30], rows[31] = rows[31], rows[30]
+    msg = errors_for(csv(rows))
+    assert "Duplicate" in msg and "increasing order" in msg

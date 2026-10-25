@@ -21,6 +21,7 @@ export default function App() {
   const [index, setIndex] = useState(null);
   const [cache, setCache] = useState({}); // dataset id -> results
   const [current, setCurrent] = useState("sim");
+  const [uploads, setUploads] = useState(0); // fresh page state (day, hazard, f) for every upload
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function App() {
 
   const onUpload = (res) => {
     setCache((c) => ({ ...c, upload: res }));
+    setUploads((n) => n + 1);
     setCurrent("upload");
   };
 
@@ -56,7 +58,7 @@ export default function App() {
         </div>
         <Upload onResult={onUpload} />
       </section>
-      {res ? <Demo key={current} res={res} /> : <p>Loading…</p>}
+      {res ? <Demo key={current === "upload" ? `upload-${uploads}` : current} res={res} /> : <p>Loading…</p>}
     </main>
   );
 }
