@@ -147,7 +147,7 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
   - Momentum's −14.4 % on 2020-11-09 is its worst day of 2020.
   - Value fell 11.0 % in 2018, 8.3 % in 2019 and 33 % in 2020 (calendar-year sums of daily returns).
 - **Datasets with no edge are kept.** Value 2018–2020 and Value latest show "No recommendation" rather than having their windows moved.
-- **Picker.** Rows are strategies and buttons are timeframes, so every choice reads "Strategy: timeframe". Small text under each button names the episode. The last row, "Your own", holds the returns upload and a "Test a trading rule" button, which only shows a work-in-progress note.
+- **Picker.** All strategies sit on one line, each labelled above its timeframe buttons, so every choice reads "Strategy: timeframe". Small text under each button names the episode. A "Your own" line below holds the returns upload and a "Test a trading rule" button, which only shows a work-in-progress note.
 - **"US market" means Mkt-RF,** the excess return over T-bills, not the total return.
 - **Default "as of" day.** Day 540 for the simulated demo, so the risk slider visibly flips the recommendation. The last day for real and uploaded data.
 - **CSV rules.**

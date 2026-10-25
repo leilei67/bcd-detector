@@ -51,14 +51,12 @@ export default function App() {
       <section>
         <h2>Choose a strategy</h2>
         <p className="caption">
-          Each row is a strategy and each button a timeframe, so every choice reads <b>Strategy: timeframe</b>.
-          The real rows are Kenneth French's daily factor returns; the small text names the episode.
+          Pick a timeframe under a strategy, so every choice reads <b>Strategy: timeframe</b>. The real strategies
+          are Kenneth French's daily factor returns; the small text names the episode.
         </p>
-        <div className="picker">
-          <div className="picker-head">Strategy</div>
-          <div className="picker-head">Timeframe</div>
+        <div className="picker-line">
           {rows.map((strategy) => (
-            <React.Fragment key={strategy}>
+            <div key={strategy} className="picker-group">
               <div className="picker-label">{strategy}</div>
               <div className="seg">
                 {index.filter((d) => d.strategy === strategy).map((d) => (
@@ -68,8 +66,10 @@ export default function App() {
                   </button>
                 ))}
               </div>
-            </React.Fragment>
+            </div>
           ))}
+        </div>
+        <div className="picker-own">
           <div className="picker-label">Your own</div>
           <OwnStrategy uploaded={cache.upload} selected={current === "upload"}
             onSelect={() => setCurrent("upload")} onResult={onUpload} />
