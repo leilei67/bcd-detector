@@ -135,7 +135,7 @@ function Demo({ res }) {
       <p className="caption">Cumulative profit and each day's return; the first {warmup} days are assumed healthy and used to learn what normal looks like.</p>
       <div className="chart-title">Cumulative PnL (% of capital)</div>
       <ResponsiveContainer width="100%" height={240}>
-        <LineChart data={series} syncId="t" margin={{ top: 10, right: 16, left: 4, bottom: 0 }}>
+        <LineChart data={series} syncId="t" syncMethod="value" margin={{ top: 10, right: 16, left: 4, bottom: 0 }}>
           <CartesianGrid stroke={C.grid} vertical={false} />
           <XAxis dataKey="day" type="number" domain={time.domain} ticks={time.ticks} tickFormatter={time.tick} tick={AXIS} />
           <YAxis tick={AXIS} width={52} />
@@ -149,7 +149,7 @@ function Demo({ res }) {
       </ResponsiveContainer>
       <div className="chart-title">Daily return (%)</div>
       <ResponsiveContainer width="100%" height={150}>
-        <BarChart data={series} syncId="t" margin={{ top: 6, right: 16, left: 4, bottom: 0 }} barCategoryGap={0}>
+        <BarChart data={series} syncId="t" syncMethod="value" margin={{ top: 6, right: 16, left: 4, bottom: 0 }} barCategoryGap={0}>
           <CartesianGrid stroke={C.grid} vertical={false} />
           <XAxis dataKey="day" type="number" domain={time.domain} ticks={time.ticks} tickFormatter={time.tick} tick={AXIS} />
           <YAxis tick={AXIS} width={52} />
@@ -336,7 +336,7 @@ function DetectorChart({ data, k, color, title, threshold, domain, fmt, fire, fi
         {title} — {fire}
       </div>
       <ResponsiveContainer width="100%" height={170}>
-        <LineChart data={data} syncId="t" margin={{ top: 10, right: 16, left: 4, bottom: 0 }}>
+        <LineChart data={data} syncId="t" syncMethod="value" margin={{ top: 10, right: 16, left: 4, bottom: 0 }}>
           <CartesianGrid stroke={C.grid} vertical={false} />
           <XAxis dataKey="day" type="number" domain={time.domain} ticks={time.ticks} tickFormatter={time.tick} tick={AXIS} />
           <YAxis tick={AXIS} width={52} domain={domain ?? [0, "auto"]} tickFormatter={fmt} />
