@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine,
+  Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceArea, ReferenceDot, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { WINDOW, costs, decideAction, evidence } from "./logic.js";
@@ -278,7 +278,7 @@ function Live({ res, time, strategy }) {
 
       <section>
         <h2>2. Three detectors, one timeline</h2>
-        <p className="caption">Each detector watches the same returns; the dashed horizontal line is its tuned trigger, the coloured vertical line is the day it first fires, and the grey line is the day being judged.</p>
+        <p className="caption">Each detector watches the same returns; the dashed horizontal line is its tuned trigger, the dot marked "fires" is the first day it crosses that trigger, and the grey line is the day being judged.</p>
         <DetectorChart data={detector} k="p" color={C.bayes} markers={lines} time={time} fire={fires(fire.bayes)} fireDay={fire.bayes}
           title={`Bayesian: probability the strategy is broken (hazard ${hazard}y, kill line T_eff = ${tEff.toFixed(2)})`}
           threshold={tEff} domain={[0, 1]} fmt={(v) => v.toFixed(2)} />
@@ -386,7 +386,13 @@ function DetectorChart({ data, k, color, title, threshold, domain, fmt, fire, fi
           <YAxis tick={AXIS} width={52} domain={domain ?? [0, "auto"]} tickFormatter={fmt} />
           {markers}
           <ReferenceLine y={threshold} stroke={color} strokeDasharray="4 4" strokeWidth={2} ifOverflow="extendDomain" />
-          {fireDay != null && <ReferenceLine x={fireDay} stroke={color} strokeWidth={3} />}
+          {fireDay != null && (
+            <ReferenceLine x={fireDay} stroke={color} strokeWidth={1.5} strokeDasharray="2 4"
+              label={{ value: "fires", position: "insideTopRight", fontSize: 14, fill: color, fontWeight: 700 }} />
+          )}
+          {fireDay != null && (
+            <ReferenceDot x={fireDay} y={data[fireDay - data[0].day][k]} r={7} fill={color} stroke="#fff" strokeWidth={2} />
+          )}
           <Tooltip formatter={(v) => fmt(v)} labelFormatter={time.label} />
           <Line dataKey={k} name={title.split(":")[0]} stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
