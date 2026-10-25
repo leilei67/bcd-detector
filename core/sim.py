@@ -40,8 +40,16 @@ def simulate(n: int, seed: int) -> StrategySet:
     return StrategySet(returns=returns, mean=mean, kind=kind, break_day=break_day)
 
 
-def demo_strategy(break_day: int = 450, seed: int = 7) -> np.ndarray:
-    """The bundled demo: one strategy with a sudden break."""
-    rng = np.random.default_rng(seed)
+def demo_strategy(break_day: int = 450) -> np.ndarray:
+    """The bundled demo: one strategy with a sudden break.
+
+    Uses the first seed whose warm-up looks like a typical healthy run (sample mean
+    within 20% of MU). The rule never looks at what happens after the warm-up, so
+    it does not pick a seed where the detectors happen to look good.
+    """
     mean = np.where(np.arange(N_DAYS) < break_day, MU, -MU)
-    return mean + SCALE * rng.standard_t(NU, size=N_DAYS)
+    for seed in range(1000):
+        r = mean + SCALE * np.random.default_rng(seed).standard_t(NU, size=N_DAYS)
+        if abs(r[:WARMUP].mean() - MU) <= 0.2 * MU:
+            return r
+    raise RuntimeError("no typical warm-up found")
