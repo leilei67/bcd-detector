@@ -43,19 +43,25 @@ export default function App() {
   if (error) return <main><p>Could not load the datasets ({error}). Run <code>uv run python -m core.run</code> first.</p></main>;
   if (!index) return <main><p>Loading…</p></main>;
   const res = cache[current];
-  const choices = [...index, ...(cache.upload ? [{ id: "upload", name: cache.upload.dataset.name }] : [])];
+  const choices = [...index, ...(cache.upload ? [{ id: "upload", name: cache.upload.dataset.name, group: "Your upload" }] : [])];
+  const groups = [...new Set(choices.map((d) => d.group))];
   return (
     <main>
       <h1>Broken, or just a bad run?</h1>
       <p className="sub">A kill-switch adviser for a solo trader's strategy.</p>
       <section>
         <h2>Choose a strategy</h2>
-        <p className="caption">Two bundled examples, one simulated and one real, or upload your own daily returns.</p>
-        <div className="seg" style={{ flexWrap: "wrap" }}>
-          {choices.map((d) => (
-            <button key={d.id} aria-pressed={current === d.id} onClick={() => setCurrent(d.id)}>{d.name}</button>
-          ))}
-        </div>
+        <p className="caption">A simulated example, real factor returns from famous episodes and from the latest data, or your own daily returns.</p>
+        {groups.map((g) => (
+          <div key={g} className="picker-group">
+            <div className="picker-label">{g}</div>
+            <div className="seg" style={{ flexWrap: "wrap" }}>
+              {choices.filter((d) => d.group === g).map((d) => (
+                <button key={d.id} aria-pressed={current === d.id} onClick={() => setCurrent(d.id)}>{d.name}</button>
+              ))}
+            </div>
+          </div>
+        ))}
         <Upload onResult={onUpload} />
       </section>
       {res ? <Demo key={current === "upload" ? `upload-${uploads}` : current} res={res} /> : <p>Loading…</p>}
