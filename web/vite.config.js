@@ -1,4 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({ plugins: [react()], base: "./" });
+export default defineConfig({
+  plugins: [react()],
+  base: "./",
+  server: { fs: { allow: [".."] } }, // the Pyodide worker imports ../core/*.py as text
+  worker: { format: "es" },
+});

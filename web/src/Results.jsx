@@ -5,6 +5,15 @@ import {
 import { C, pct } from "./theme.js";
 import { nearestPoint } from "./logic.js";
 
+// Where the scored strategies came from. Real data has no known break, so these panels never use it directly.
+function simSource(res) {
+  const [mu, sigma, nu] = res.dataset.sim_params;
+  const params = `μ = ${pct(mu, 3)} a day, σ = ${pct(sigma, 2)}, ν = ${nu.toFixed(1)}`;
+  return res.dataset.resimulated
+    ? `Simulated strategies drawn from this series' own warm-up fit (${params}), never from its later returns.`
+    : `Simulated strategies (${params}).`;
+}
+
 const AXIS = { fontSize: 14, fill: C.ink2 };
 const axisLabel = (value, axis) =>
   axis === "x"
@@ -29,7 +38,7 @@ export function Tradeoff({ res, hazard, tEff }) {
   return (
     <section>
       <h2>6. The trade-off: kill too early or too late</h2>
-      <p className="caption">Each point is a kill line T on the test set: a lower line kills more healthy strategies, a higher line loses more money after a real break.</p>
+      <p className="caption">Each point is a kill line T on the test set: a lower line kills more healthy strategies, a higher line loses more money after a real break. {simSource(res)}</p>
       <ResponsiveContainer width="100%" height={340}>
         <ScatterChart margin={{ top: 10, right: 24, left: 16, bottom: 24 }}>
           <CartesianGrid stroke={C.grid} />
@@ -65,7 +74,7 @@ export function Scoreboard({ res }) {
       <h2>7. Scoreboard (test set only)</h2>
       <p className="caption">
         Every threshold was tuned on {res.config.train.n} training strategies (seed {res.config.train.seed}) and is scored here on {res.config.test.n} fresh ones
-        (seed {res.config.test.seed}); regret is profit lost against an oracle that stops exactly at the true break.
+        (seed {res.config.test.seed}); regret is profit lost against an oracle that stops exactly at the true break. {simSource(res)}
       </p>
       <p className="verdict">
         {bayesWon ? <><b>{best.label}</b> has the lowest test regret.</> : <><b>The tuned Bayesian rule ({tunedBayes.label}) did not win on the test set:</b> {best.label} did.</>}{" "}
@@ -110,7 +119,7 @@ export function Calibration({ res, hazard }) {
   return (
     <section>
       <h2>8. Is the probability honest?</h2>
-      <p className="caption">When the model says "30% broken", about 30% of those days should really be broken: points on the diagonal mean the probability can be taken at face value.</p>
+      <p className="caption">When the model says "30% broken", about 30% of those days should really be broken: points on the diagonal mean the probability can be taken at face value. {simSource(res)}</p>
       <ResponsiveContainer width="100%" height={360}>
         <ScatterChart margin={{ top: 10, right: 24, left: 16, bottom: 24 }}>
           <CartesianGrid stroke={C.grid} />
@@ -127,7 +136,7 @@ export function Calibration({ res, hazard }) {
           )} />
         </ScatterChart>
       </ResponsiveContainer>
-      <p className="note">All {res.config.test.n} test strategies × {res.config.n_days - res.config.warmup} post-warm-up days, hazard {hazard}y, no restarts. Below the line, the model is more alarmed than it should be; above it, less.</p>
+      <p className="note">All {res.config.test.n} test strategies × {res.config.sim_days - res.config.warmup} post-warm-up days, hazard {hazard}y, no restarts. Below the line, the model is more alarmed than it should be; above it, less.</p>
     </section>
   );
 }

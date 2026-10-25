@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -8,7 +8,6 @@ import { Calibration, Scoreboard, Tradeoff } from "./Results.jsx";
 import { C, pct } from "./theme.js";
 
 const AXIS = { fontSize: 14, fill: C.ink2 };
-const DAY_TICKS = [0, 100, 200, 300, 400, 500, 600, 700];
 
 const ACTIONS = {
   keep: { color: "var(--good)", icon: "✓" },
@@ -19,32 +18,180 @@ const ACTIONS = {
 };
 
 export default function App() {
-  const [res, setRes] = useState(null);
+  const [index, setIndex] = useState(null);
+  const [cache, setCache] = useState({}); // dataset id -> results
+  const [current, setCurrent] = useState("sim");
   const [error, setError] = useState(null);
+
   useEffect(() => {
-    fetch("results.json").then((r) => r.json()).then(setRes).catch((e) => setError(String(e)));
+    fetch("datasets/index.json").then((r) => r.json()).then(setIndex).catch((e) => setError(String(e)));
   }, []);
-  if (error) return <main><p>Could not load results.json ({error}). Run <code>uv run python -m core.run</code> first.</p></main>;
-  if (!res) return <main><p>Loading…</p></main>;
-  return <Demo res={res} />;
+  useEffect(() => {
+    const entry = index?.find((d) => d.id === current);
+    if (!entry || cache[current]) return;
+    fetch(entry.file).then((r) => r.json()).then((res) => setCache((c) => ({ ...c, [current]: res })))
+      .catch((e) => setError(String(e)));
+  }, [index, current, cache]);
+
+  const onUpload = (res) => {
+    setCache((c) => ({ ...c, upload: res }));
+    setCurrent("upload");
+  };
+
+  if (error) return <main><p>Could not load the datasets ({error}). Run <code>uv run python -m core.run</code> first.</p></main>;
+  if (!index) return <main><p>Loading…</p></main>;
+  const res = cache[current];
+  const choices = [...index, ...(cache.upload ? [{ id: "upload", name: cache.upload.dataset.name }] : [])];
+  return (
+    <main>
+      <h1>Broken, or just a bad run?</h1>
+      <p className="sub">A kill-switch adviser for a solo trader's strategy.</p>
+      <section>
+        <h2>Choose a strategy</h2>
+        <p className="caption">Two bundled examples, one simulated and one real, or upload your own daily returns.</p>
+        <div className="seg" style={{ flexWrap: "wrap" }}>
+          {choices.map((d) => (
+            <button key={d.id} aria-pressed={current === d.id} onClick={() => setCurrent(d.id)}>{d.name}</button>
+          ))}
+        </div>
+        <Upload onResult={onUpload} />
+      </section>
+      {res ? <Demo key={current} res={res} /> : <p>Loading…</p>}
+    </main>
+  );
+}
+
+function Upload({ onResult }) {
+  const worker = useRef(null);
+  const [status, setStatus] = useState(null);
+  const [errors, setErrors] = useState([]);
+  const [busy, setBusy] = useState(false);
+
+  const run = async (file) => {
+    if (!file) return;
+    setErrors([]);
+    setBusy(true);
+    setStatus(`Reading ${file.name}…`);
+    worker.current ??= new Worker(new URL("./pyworker.js", import.meta.url), { type: "module" });
+    worker.current.onmessage = ({ data }) => {
+      if (data.status) return setStatus(data.status);
+      setBusy(false);
+      if (data.error) { setStatus(null); return setErrors([`Analysis failed: ${data.error}`]); }
+      if (data.result.errors) { setStatus(null); return setErrors(data.result.errors); }
+      setStatus(`Analysed ${file.name}.`);
+      onResult(data.result);
+    };
+    worker.current.postMessage({ text: await file.text(), name: file.name.replace(/\.csv$/i, "") });
+  };
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <label htmlFor="csv" style={{ fontWeight: 600 }}>Upload a CSV with columns <code>date, return</code> (YYYY-MM-DD, daily returns as decimals: 1% = 0.01)</label>
+      <div>
+        <input id="csv" type="file" accept=".csv,text/csv" disabled={busy}
+          onChange={(e) => run(e.target.files[0])} style={{ font: "inherit", marginTop: 6 }} />
+      </div>
+      {status && <p className="note" role="status">{status}</p>}
+      {errors.length > 0 && (
+        <div className="problems" role="alert">
+          <b>This file can't be analysed yet:</b>
+          <ul>{errors.map((m) => <li key={m}>{m}</li>)}</ul>
+        </div>
+      )}
+      <p className="note">Runs the same Python as the bundled examples, in your browser via Pyodide. The first upload downloads Python (about 30 MB, needs internet); the analysis takes a few seconds. Nothing leaves your machine.</p>
+    </div>
+  );
+}
+
+// Day index -> label: a date for real data, "day N" for the simulated demo.
+function useTimeAxis(demo, n) {
+  return useMemo(() => {
+    const dates = demo.dates;
+    const step = [50, 100, 125, 250, 500].find((s) => n / s <= 8) ?? Math.ceil(n / 8);
+    const ticks = Array.from({ length: Math.floor((n - 1) / step) + 1 }, (_, k) => k * step);
+    return {
+      ticks,
+      domain: [0, n - 1],
+      tick: (d) => (dates ? dates[d]?.slice(0, 7) : String(d)),
+      label: (d) => (dates ? dates[d] : `day ${d}`),
+    };
+  }, [demo, n]);
 }
 
 function Demo({ res }) {
-  const { demo, tuned, config } = res;
+  const { demo, config, dataset } = res;
+  const warmup = demo.warmup;
+  const time = useTimeAxis(demo, config.n_days);
+  const series = useMemo(() => {
+    let eq = 0;
+    return demo.returns.map((r, d) => ({ day: d, ret: 100 * r, equity: 100 * (eq += r) }));
+  }, [demo]);
+
+  const strategy = (markers) => (
+    <section>
+      <h2>1. The strategy</h2>
+      <p className="caption">Cumulative profit and each day's return; the first {warmup} days are assumed healthy and used to learn what normal looks like.</p>
+      <div className="chart-title">Cumulative PnL (% of capital)</div>
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={series} syncId="t" margin={{ top: 10, right: 16, left: 4, bottom: 0 }}>
+          <CartesianGrid stroke={C.grid} vertical={false} />
+          <XAxis dataKey="day" type="number" domain={time.domain} ticks={time.ticks} tickFormatter={time.tick} tick={AXIS} />
+          <YAxis tick={AXIS} width={52} />
+          <ReferenceArea x1={0} x2={warmup} fill={C.grid} fillOpacity={0.5}
+            label={{ value: "warm-up (assumed healthy)", position: "insideTop", fontSize: 14, fill: C.ink2 }} />
+          {markers.lines}
+          {markers.asOf}
+          <Tooltip formatter={(v) => `${v.toFixed(2)}%`} labelFormatter={time.label} />
+          <Line dataKey="equity" name="Cumulative PnL" stroke={C.ink} strokeWidth={2} dot={false} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="chart-title">Daily return (%)</div>
+      <ResponsiveContainer width="100%" height={150}>
+        <BarChart data={series} syncId="t" margin={{ top: 6, right: 16, left: 4, bottom: 0 }} barCategoryGap={0}>
+          <CartesianGrid stroke={C.grid} vertical={false} />
+          <XAxis dataKey="day" type="number" domain={time.domain} ticks={time.ticks} tickFormatter={time.tick} tick={AXIS} />
+          <YAxis tick={AXIS} width={52} />
+          <ReferenceLine y={0} stroke={C.ink2} />
+          {demo.break_day != null && <ReferenceLine x={demo.break_day} stroke={C.ink} strokeDasharray="6 4" />}
+          <Tooltip formatter={(v) => `${v.toFixed(2)}%`} labelFormatter={time.label} />
+          <Bar dataKey="ret" name="Return" fill={C.ink2} isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </section>
+  );
+
+  return (
+    <>
+      <p className="sub" style={{ marginTop: 8 }}><b>{dataset.name}.</b> {dataset.caption}</p>
+      {res.warning ? (
+        <>
+          {strategy({ lines: null, asOf: null })}
+          <section className="problems" role="alert">
+            <h2>No recommendation</h2>
+            <p className="evidence">{res.warning}</p>
+            <p className="note">The tool assumes the warm-up shows a real edge. Try a window where the strategy was making money for its first {warmup} days.</p>
+          </section>
+        </>
+      ) : (
+        <Live res={res} time={time} strategy={strategy} />
+      )}
+    </>
+  );
+}
+
+function Live({ res, time, strategy }) {
+  const { demo, tuned, config, dataset } = res;
   const warmup = demo.warmup;
   const [f, setF] = useState(1);
   const [hazard, setHazard] = useState(String(config.default_hazard));
-  const [day, setDay] = useState(540);
+  const [day, setDay] = useState(config.default_day);
 
   const T = tuned.T[hazard];
   const tEff = f * T;
   const p = demo.p[hazard];
   const i = day - warmup; // index into the post-warm-up detector series
+  const hasBreak = demo.break_day != null;
 
-  const series = useMemo(() => {
-    let eq = 0;
-    return demo.returns.map((r, d) => ({ day: d, ret: 100 * r, equity: 100 * (eq += r) }));
-  }, [demo]);
   const detector = useMemo(
     () => p.map((v, k) => ({ day: k + warmup, p: v, cusum: demo.cusum[k], dd: demo.drawdown[k] })),
     [p, demo, warmup],
@@ -64,69 +211,41 @@ function Demo({ res }) {
   const ev = evidence(demo.returns, day, demo.baseline, demo.drawdown[i]);
   const cost = costs(p[i], demo.baseline.mu);
 
-  const markers = (
+  const lines = (
     <>
       <ReferenceLine x={day} stroke={C.ink2} strokeWidth={2} />
-      <ReferenceLine x={demo.break_day} stroke={C.ink} strokeDasharray="6 4"
-        label={{ value: "true break", position: "insideTopLeft", fontSize: 14, fill: C.ink }} />
+      {hasBreak && (
+        <ReferenceLine x={demo.break_day} stroke={C.ink} strokeDasharray="6 4"
+          label={{ value: "true break", position: "insideTopLeft", fontSize: 14, fill: C.ink }} />
+      )}
     </>
   );
+  const asOf = (
+    <ReferenceLine x={day} stroke="none"
+      label={{ value: `as of ${time.label(day)}`, position: "insideBottomRight", fontSize: 14, fill: C.ink2 }} />
+  );
+  const fires = (d) => (d == null ? "does not fire" : `fires ${time.label(d)}`);
 
   return (
-    <main>
-      <h1>Broken, or just a bad run?</h1>
-      <p className="sub">
-        A kill-switch adviser for a solo trader's strategy. Demo strategy: simulated, healthy for 450 days, then its edge flips negative.
-      </p>
-
-      <section>
-        <h2>1. The strategy</h2>
-        <p className="caption">Cumulative profit and each day's return; the first {warmup} days are assumed healthy and used to learn what normal looks like.</p>
-        <div className="chart-title">Cumulative PnL (% of capital)</div>
-        <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={series} syncId="t" margin={{ top: 10, right: 16, left: 4, bottom: 0 }}>
-            <CartesianGrid stroke={C.grid} vertical={false} />
-            <XAxis dataKey="day" type="number" domain={[0, 749]} ticks={DAY_TICKS} tick={AXIS} />
-            <YAxis tick={AXIS} width={52} />
-            <ReferenceArea x1={0} x2={warmup} fill={C.grid} fillOpacity={0.5}
-              label={{ value: "warm-up (assumed healthy)", position: "insideTop", fontSize: 14, fill: C.ink2 }} />
-            {markers}
-            <ReferenceLine x={day} stroke="none"
-              label={{ value: `as of day ${day}`, position: "insideBottomRight", fontSize: 14, fill: C.ink2 }} />
-            <Tooltip formatter={(v) => `${v.toFixed(2)}%`} labelFormatter={(d) => `day ${d}`} />
-            <Line dataKey="equity" name="Cumulative PnL" stroke={C.ink} strokeWidth={2} dot={false} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-        <div className="chart-title">Daily return (%)</div>
-        <ResponsiveContainer width="100%" height={150}>
-          <BarChart data={series} syncId="t" margin={{ top: 6, right: 16, left: 4, bottom: 0 }} barCategoryGap={0}>
-            <CartesianGrid stroke={C.grid} vertical={false} />
-            <XAxis dataKey="day" type="number" domain={[0, 749]} ticks={DAY_TICKS} tick={AXIS} />
-            <YAxis tick={AXIS} width={52} />
-            <ReferenceLine y={0} stroke={C.ink2} />
-            <ReferenceLine x={demo.break_day} stroke={C.ink} strokeDasharray="6 4" />
-            <Tooltip formatter={(v) => `${v.toFixed(2)}%`} labelFormatter={(d) => `day ${d}`} />
-            <Bar dataKey="ret" name="Return" fill={C.ink2} isAnimationActive={false} />
-          </BarChart>
-        </ResponsiveContainer>
-      </section>
+    <>
+      {strategy({ lines, asOf })}
 
       <section>
         <h2>2. Three detectors, one timeline</h2>
         <p className="caption">Each detector watches the same returns; the dashed horizontal line is its tuned trigger, the coloured vertical line is the day it first fires, and the grey line is the day being judged.</p>
-        <DetectorChart data={detector} k="p" color={C.bayes} markers={markers} fire={fire.bayes}
+        <DetectorChart data={detector} k="p" color={C.bayes} markers={lines} time={time} fire={fires(fire.bayes)} fireDay={fire.bayes}
           title={`Bayesian: probability the strategy is broken (hazard ${hazard}y, kill line T_eff = ${tEff.toFixed(2)})`}
           threshold={tEff} domain={[0, 1]} fmt={(v) => v.toFixed(2)} />
-        <DetectorChart data={detector} k="cusum" color={C.cusum} markers={markers} fire={fire.cusum}
+        <DetectorChart data={detector} k="cusum" color={C.cusum} markers={lines} time={time} fire={fires(fire.cusum)} fireDay={fire.cusum}
           title={`CUSUM: accumulated evidence for "broken" (trigger c = ${tuned.c})`}
           threshold={tuned.c} fmt={(v) => v.toFixed(1)} />
-        <DetectorChart data={detector} k="dd" color={C.dd} markers={markers} fire={fire.dd}
+        <DetectorChart data={detector} k="dd" color={C.dd} markers={lines} time={time} fire={fires(fire.dd)} fireDay={fire.dd}
           title={`Drawdown depth in daily sigmas (trigger d = ${tuned.d})`}
           threshold={tuned.d} fmt={(v) => v.toFixed(1)} />
       </section>
 
       <section>
-        <h2>3. Recommendation, as of day {day}</h2>
+        <h2>3. Recommendation, as of {time.label(day)}</h2>
         <p className="caption">What to do today, from the Bayesian probability, the CUSUM alarm and the kill line set by the risk slider below.</p>
         <div className="row" style={{ alignItems: "center" }}>
           <div>
@@ -190,9 +309,12 @@ function Demo({ res }) {
             <div className="note">Each hazard has its own tuned T: {config.hazard_years.map((y) => `${y}y → ${tuned.T[y]}`).join(", ")}.</div>
           </div>
           <div>
-            <label htmlFor="day">As of day {day}</label>
+            <label htmlFor="day">As of {time.label(day)}</label>
             <input id="day" type="range" min={warmup} max={config.n_days - 1} step={1} value={day} onChange={(e) => setDay(Number(e.target.value))} />
-            <div className="note">True break is day {demo.break_day}.</div>
+            <div className="note">
+              {hasBreak ? `True break is ${time.label(demo.break_day)}.`
+                : dataset.resimulated ? "Real data: nobody knows the true break day." : ""}
+            </div>
           </div>
         </div>
       </section>
@@ -200,26 +322,26 @@ function Demo({ res }) {
       <Tradeoff res={res} hazard={hazard} tEff={tEff} />
       <Scoreboard res={res} />
       <Calibration res={res} hazard={hazard} />
-    </main>
+    </>
   );
 }
 
-function DetectorChart({ data, k, color, title, threshold, domain, fmt, fire, markers }) {
+function DetectorChart({ data, k, color, title, threshold, domain, fmt, fire, fireDay, markers, time }) {
   return (
     <>
       <div className="chart-title">
         <span style={{ display: "inline-block", width: 18, height: 3, background: color, verticalAlign: "middle", marginRight: 8 }} />
-        {title} — {fire == null ? "does not fire" : `fires day ${fire}`}
+        {title} — {fire}
       </div>
       <ResponsiveContainer width="100%" height={170}>
         <LineChart data={data} syncId="t" margin={{ top: 10, right: 16, left: 4, bottom: 0 }}>
           <CartesianGrid stroke={C.grid} vertical={false} />
-          <XAxis dataKey="day" type="number" domain={[0, 749]} ticks={DAY_TICKS} tick={AXIS} />
+          <XAxis dataKey="day" type="number" domain={time.domain} ticks={time.ticks} tickFormatter={time.tick} tick={AXIS} />
           <YAxis tick={AXIS} width={52} domain={domain ?? [0, "auto"]} tickFormatter={fmt} />
           {markers}
           <ReferenceLine y={threshold} stroke={color} strokeDasharray="4 4" strokeWidth={2} ifOverflow="extendDomain" />
-          {fire != null && <ReferenceLine x={fire} stroke={color} strokeWidth={3} />}
-          <Tooltip formatter={(v) => fmt(v)} labelFormatter={(d) => `day ${d}`} />
+          {fireDay != null && <ReferenceLine x={fireDay} stroke={color} strokeWidth={3} />}
+          <Tooltip formatter={(v) => fmt(v)} labelFormatter={time.label} />
           <Line dataKey={k} name={title.split(":")[0]} stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>

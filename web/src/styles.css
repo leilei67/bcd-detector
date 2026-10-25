@@ -61,3 +61,5 @@ tr.best td { font-weight: 700; }
 .scroll { overflow-x: auto; }
 .legend { display: flex; gap: 18px; flex-wrap: wrap; color: var(--text-2); font-size: 15px; margin-top: 6px; }
 .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 6px; }
+.problems { border: 2px solid var(--critical); border-radius: 8px; padding: 10px 16px; margin-top: 12px; }
+.problems ul { margin: 6px 0 0; padding-left: 22px; }
