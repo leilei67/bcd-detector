@@ -6,7 +6,7 @@ Tuning is honest. Every threshold is tuned on 300 simulated strategies (seed 1) 
 
 The page has three ways in:
 - a simulated demo strategy;
-- a real one, Kenneth French's momentum factor through its 2009 crash;
+- six real ones from Kenneth French's daily factors: three famous episodes (momentum's 2009 crash and 2020 vaccine-news day, value's 2018–2020 slump) and the latest 750 days of momentum, value and the US market;
 - your own CSV, analysed in the browser.
 
 ## Run it
@@ -16,7 +16,7 @@ Needs [uv](https://docs.astral.sh/uv/) and Node 20+.
 ```bash
 uv sync                      # numpy, scipy, pytest
 uv run pytest -q             # maths tests
-uv run python -m core.run    # analyse both bundled datasets, write web/public/datasets/ (~4 s)
+uv run python -m core.run    # analyse every bundled dataset, write web/public/datasets/ (~8 s)
 
 cd web
 npm install
@@ -24,8 +24,8 @@ npm test                     # browser-side decision rule tests
 npm run dev                  # open the printed URL
 ```
 
-- **Committed outputs.** `web/public/datasets/*.json` and `data/umd_2007_2009.csv` are committed, so the bundled examples work offline without running Python first.
-- **Re-downloading the real data.** Run `uv run python scripts/fetch_umd.py`.
+- **Committed outputs.** `web/public/datasets/*.json` and `data/*.csv` are committed, so the bundled examples work offline without running Python first.
+- **Re-downloading the real data.** Run `uv run python scripts/fetch_data.py`. It writes every window listed in `core/datasets.py`. The "latest" windows move forward when the source files are updated.
 - **Uploads.** An upload runs `core/pipeline.py` itself in a web worker via [Pyodide](https://pyodide.org). The first upload downloads Python, numpy and scipy from the jsdelivr CDN (about 30 MB, so it needs internet). After that, an analysis takes a few seconds. The file never leaves the browser.
 
 ### CSV format
@@ -66,15 +66,44 @@ The page lists every problem it finds at once:
 
 About a third of strategies get a "false kill" under every tuned rule. Most of these are broken strategies killed shortly before their break, including decay strategies whose mean was already sliding. Regret tuning accepts them, because a false kill only costs the 60-day sit-out.
 
-## Real data: momentum factor (UMD), 2007–2009
+## Real data: Kenneth French factors
 
-**Source.** [Kenneth R. French Data Library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html), "Momentum Factor (Mom)", daily. The factor is long the past year's winners and short the past year's losers. The source file is in percent; `scripts/fetch_umd.py` converts it to decimals.
+**Source.** [Kenneth R. French Data Library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html), daily files:
+- "Momentum Factor (Mom)": long the past year's winners, short the past year's losers.
+- "Fama/French 3 Factors": the value factor HML (long cheap stocks by book-to-market, short expensive ones) and Mkt-RF (the US market's return above the one-month T-bill).
 
-**Licence.** The file says "Copyright Eugene F. Fama and Kenneth R. French". The library is free to download and states no explicit licence. This repo redistributes a 750-row excerpt for a non-commercial demo, with attribution. Check the terms before any other use.
+The files are in percent. `core/french.py` converts them to decimals, and fails loudly on a missing-data marker (−99.99 / −999) inside a window. The current files run to 2026-08-31.
 
-**Window.** The 750 trading days ending 2009-12-31 (2007-01-11 to 2009-12-31). This is the same shape as the simulated strategies, so 2007 is the warm-up. We picked it because the 2009 momentum crash is the textbook "broken or bad run?" case, and the page caption says so.
+**Licence.** The files say "Copyright Eugene F. Fama and Kenneth R. French". The library is free to download and states no explicit licence. This repo redistributes six 750-row excerpts for a non-commercial demo, with attribution. Check the terms before any other use.
 
-**Tuning.** The 2007 fit (μ = 0.12 % a day, σ = 0.40 %, ν = 3.5) seeds the simulated train and test sets. The crash itself is never used.
+**Window rule, the same for every dataset.**
+- 750 trading days ending on a stated date, the same shape as the simulated strategies. The first 250 are the warm-up.
+- Historical episodes end on 31 December of the episode year.
+- "Latest" windows end on the last date in the source file, so no hindsight went into choosing them.
+- Every window and its one-line reason is listed in `core/datasets.py` and shown in the page caption.
+
+**Tuning.** Each series' warm-up fit seeds its own simulated train and test sets. The real returns after the warm-up are never used for tuning.
+
+| Dataset | Window | Warm-up fitted mean (a day) | Test-set winner | First fires on the real series |
+|---|---|---|---|---|
+| Simulated demo strategy | days 0–749 | +0.153 % | Bayesian (hazard 1y) | Bayes 2y day 547; CUSUM day 550; drawdown day 547 (true break: day 450) |
+| Momentum: 2009 crash | 2007-01-11 – 2009-12-31 | +0.121 % | Bayesian (hazard 2y) | Bayes 2y 2009-01-02; CUSUM 2009-01-05; drawdown 2008-01-23 |
+| Momentum: 2020 vaccine-news day | 2018-01-10 – 2020-12-31 | +0.049 % | Drawdown depth | Bayes 2y never; CUSUM never; drawdown 2019-09-10 |
+| Value: 2018–2020 slump | 2018-01-10 – 2020-12-31 | −0.071 % | no recommendation (warm-up has no edge) | – |
+| Momentum: latest | 2023-09-05 – 2026-08-31 | +0.062 % | Drawdown depth | Bayes 2y never; CUSUM 2026-08-28; drawdown 2026-08-10 |
+| Value: latest | 2023-09-05 – 2026-08-31 | −0.003 % | no recommendation (warm-up has no edge) | – |
+| US market: latest | 2023-09-05 – 2026-08-31 | +0.094 % | Drawdown depth | Bayes 2y never; CUSUM never; drawdown 2025-04-03 |
+
+What the new datasets show:
+- **Momentum, 2020.** The vaccine-news day (9 Nov 2020, −14.4 %) is momentum's worst day of 2020. The heavy-tailed model treats one day like that as a tail event, not proof of a break, so the Bayesian rule and CUSUM never fire. Drawdown fires earlier, on 2019-09-10.
+- **Value, 2018–2020.** Under the fixed rule, the warm-up (2018) is already inside value's slump. With no positive edge to protect, the page shows "No recommendation". We kept it rather than move the window, because moving it would be cherry-picking.
+- **Value, latest.** Also no edge in its warm-up (2023–24), so also "No recommendation".
+- **Momentum, latest.** On the last day (2026-08-31) the recommendation is **pause**: CUSUM fired on 2026-08-28, and drawdown on 2026-08-10.
+- **Who wins on test regret.** These warm-ups have lower Sharpe ratios than the simulated demo, and on their simulations drawdown depth wins on test regret. Each scoreboard says so plainly.
+
+### Momentum, 2009 crash in detail
+
+The 2007 warm-up fit (μ = 0.12 % a day, σ = 0.40 %, ν = 3.5) seeds the simulations. The crash itself is never used.
 
 | Rule (tuned on simulations of the 2007 fit) | Threshold | Test regret | Gap vs best | First fires on the real series |
 |---|---|---|---|---|
@@ -114,7 +143,11 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
   - Check: a test confirms the fit's likelihood is at least scipy's MLE on every test series.
   - Effect: the simulated scoreboard moved by at most 0.4 points.
 - **Simulation horizon.** The simulated strategies are as long as the series being judged, with a minimum of 380 days, which leaves room for a 120-day decay after the warm-up. That way the thresholds suit how long the strategy has been live. A long upload (say 10 years) therefore takes proportionally longer to analyse.
-- **Real-data window.** As above: 750 days ending at the end of the crash year, the same shape as the simulations.
+- **Real-data windows.** As above: one rule, with each reason in `core/datasets.py`. The episodes were checked in the data before they were bundled:
+  - Momentum's −14.4 % on 2020-11-09 is its worst day of 2020.
+  - Value fell 10.6 % in 2018, 8.3 % in 2019 and 33 % in 2020 (sums of daily returns).
+- **Datasets with no edge are kept.** Value 2018–2020 and Value latest show "No recommendation" rather than having their windows moved.
+- **"US market" means Mkt-RF,** the excess return over T-bills, not the total return.
 - **Default "as of" day.** Day 540 for the simulated demo, so the risk slider visibly flips the recommendation. The last day for real and uploaded data.
 - **CSV rules.**
   - Dates must be ISO.
@@ -138,7 +171,7 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
 ## Not built yet
 
 - **Edge gate.** There is no "was the edge ever real?" test. The tool only refuses outright when the warm-up's fitted mean is zero or negative; a lucky positive warm-up passes.
-- **Real data.** There is one real episode (UMD 2009), not a library of real strategies with known break dates. All tuning is on simulations.
+- **Real data.** There are six real factor windows, but none is a real trader's strategy with known break dates. All tuning is on simulations.
 - **Volatility.** The model has no volatility-change detector. "Broken" means the mean flipped.
 - **Decision journal.** Nothing records what was recommended and what the trader did.
 - **Bands.** The keep / investigate / reduce bands are a heuristic. Only the kill line T is tuned.
