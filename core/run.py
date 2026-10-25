@@ -7,35 +7,44 @@ from pathlib import Path
 
 from core.data import parse_returns_csv
 from core.pipeline import analyse
-from core.sim import MU, NU, SCALE, demo_strategy
+from core.datasets import FACTORS, REAL, WINDOW_DAYS
+from core.sim import MU, NU, SCALE, WARMUP, demo_strategy
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "web" / "public" / "datasets"
-UMD_CSV = ROOT / "data" / "umd_2007_2009.csv"
-UMD_CAPTION = (
-    "Kenneth French's daily momentum factor (long last year's winners, short last year's losers): the 750 trading days "
-    "ending 31 Dec 2009, the same shape as the simulated strategies, so 2007 is the healthy warm-up. We picked this "
-    "window because the 2009 momentum crash is the textbook 'broken or bad run?' case. Thresholds were tuned on "
-    "strategies simulated from the 2007 fit, never on these returns."
-)
+
+
+def caption(ds, dates):
+    when = "ending at the latest date in the source file" if ds["end"] is None else f"ending {ds['end']}"
+    return (f"{FACTORS[ds['column']]}. Window: the {WINDOW_DAYS} trading days {when} ({dates[0]} to {dates[-1]}); "
+            f"the first {WARMUP} (to {dates[WARMUP - 1]}) are the healthy warm-up. Why this window: {ds['reason']} "
+            "Same rule for every real dataset. Thresholds were tuned on strategies simulated from the warm-up fit, "
+            "never on these returns. Source: Kenneth R. French Data Library.")
 
 
 def build():
-    sim = analyse(demo_strategy(), sim_params=(MU, SCALE, NU), name="Simulated demo strategy",
-                  caption="A simulated strategy, healthy for 450 days, then its edge flips negative.",
-                  break_day=450, default_day=540)
-    dates, returns = parse_returns_csv(UMD_CSV.read_text())
-    umd = analyse(returns, dates, name="Momentum factor (UMD), 2007–2009", caption=UMD_CAPTION)
-    return {"sim": sim, "umd": umd}
+    datasets = {"sim": analyse(
+        demo_strategy(), sim_params=(MU, SCALE, NU), name="Simulated demo strategy",
+        caption="A simulated strategy, healthy for 450 days, then its edge flips negative.",
+        break_day=450, default_day=540)}
+    groups = {"sim": "Simulated"}
+    for ds in REAL:
+        dates, returns = parse_returns_csv((ROOT / "data" / f"{ds['id']}.csv").read_text())
+        datasets[ds["id"]] = analyse(returns, dates, name=ds["name"], caption=caption(ds, dates))
+        groups[ds["id"]] = ds["group"]
+    return datasets, groups
 
 
 def main():
-    datasets = build()
+    datasets, groups = build()
     OUT.mkdir(parents=True, exist_ok=True)
+    for old in OUT.glob("*.json"):
+        old.unlink()  # drop datasets no longer in the registry
     for key, res in datasets.items():
         (OUT / f"{key}.json").write_text(json.dumps(res, allow_nan=False))
         print_board(res)
-    index = [{"id": k, "name": v["dataset"]["name"], "file": f"datasets/{k}.json"} for k, v in datasets.items()]
+    index = [{"id": k, "name": v["dataset"]["name"], "group": groups[k], "file": f"datasets/{k}.json"}
+             for k, v in datasets.items()]
     (OUT / "index.json").write_text(json.dumps(index))
     print(f"wrote {OUT}")
 
