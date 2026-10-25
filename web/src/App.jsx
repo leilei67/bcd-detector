@@ -80,13 +80,12 @@ export default function App() {
   );
 }
 
-// The "Your own" picker row: upload daily returns (works), or test a trading rule (work in progress).
+// The "Your own" picker row: upload a CSV of daily returns.
 function OwnStrategy({ uploaded, selected, onSelect, onResult }) {
   const worker = useRef(null);
   const [status, setStatus] = useState(null);
   const [errors, setErrors] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [showWip, setShowWip] = useState(false);
 
   const run = async (file) => {
     if (!file) return;
@@ -120,18 +119,8 @@ function OwnStrategy({ uploaded, selected, onSelect, onResult }) {
             <span className="btn-note">your upload</span>
           </button>
         )}
-        <button aria-expanded={showWip} onClick={() => setShowWip((v) => !v)}>
-          <span>Test a trading rule</span><span className="btn-note">work in progress</span>
-        </button>
       </div>
       <div className="picker-wide">
-        {showWip && (
-          <p className="wip" role="status">
-            <b>Work in progress.</b> Soon you'll describe a trading rule (for example, "hold the market when its 50-day
-            average is above its 200-day") and we'll backtest it, then run the detectors on the result. For now, export
-            your strategy's daily returns and upload them as a CSV.
-          </p>
-        )}
         {status && <p className="note" role="status">{status}</p>}
         {errors.length > 0 && (
           <div className="problems" role="alert">

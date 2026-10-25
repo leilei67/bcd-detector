@@ -151,7 +151,7 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
   - Momentum's −14.4 % on 2020-11-09 is its worst day of 2020.
   - Value fell 11.0 % in 2018, 8.3 % in 2019 and 33 % in 2020 (calendar-year sums of daily returns).
 - **Datasets with no edge are kept.** Value 2018–2020 and Value latest show "No recommendation" rather than having their windows moved.
-- **Picker.** All strategies sit on one line, each labelled above its timeframe buttons, so every choice reads "Strategy: timeframe". Small text under each button names the episode. A "Your own" line below holds the returns upload and a "Test a trading rule" button, which only shows a work-in-progress note.
+- **Picker.** All strategies sit on one line, each labelled above its timeframe buttons, so every choice reads "Strategy: timeframe". Small text under each button names the episode. A "Your own" line below holds the returns upload.
 - **"US market" means Mkt-RF,** the excess return over T-bills, not the total return.
 - **Default "as of" day.** Day 540 for the simulated demo, so the risk slider visibly flips the recommendation. The last day for real and uploaded data.
 - **CSV rules.**
@@ -181,7 +181,6 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
 - **Decision journal.** Nothing records what was recommended and what the trader did.
 - **Bands.** The keep / investigate / reduce bands are a heuristic. Only the kill line T is tuned.
 - **Offline uploads.** Uploading needs internet the first time, to download Pyodide. Vendoring Pyodide into the build would fix this, at about 30 MB.
-- **Trading rules.** The "Test a trading rule" button is a placeholder: describing a rule and backtesting it is not built.
 - **Other upload formats.** There is no upload of prices, equity curves or trade logs. Only daily returns are accepted.
 
 ## Review notes
