@@ -46,8 +46,8 @@ export default function App() {
   const rows = [...new Set(index.map((d) => d.strategy))];
   return (
     <main>
-      <h1>Broken, or just a bad run?</h1>
-      <p className="sub">A kill-switch adviser for a solo trader's strategy.</p>
+      <h1>Killswitch</h1>
+      <p className="sub">Is your strategy broken, or just having a bad run? A kill-switch adviser for solo traders.</p>
       <section>
         <h2>Choose a strategy</h2>
         <p className="caption">

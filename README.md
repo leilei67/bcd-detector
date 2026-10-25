@@ -1,4 +1,6 @@
-# Broken, or just a bad run?
+# Killswitch
+
+*Is your strategy broken, or just having a bad run?*
 
 A kill-switch adviser for a solo trader whose strategy is losing money. It reads daily returns and recommends **keep / investigate / reduce / pause / kill**, weighing two ways of being wrong: killing a strategy that was fine, and riding a broken one too long.
 
@@ -8,6 +10,8 @@ The page has three ways in:
 - a simulated demo strategy;
 - six real ones from Kenneth French's daily factors: three famous episodes (momentum's 2009 crash and 2020 vaccine-news day, value's 2018–2020 slump) and the latest 750 days of momentum, value and the US market;
 - your own CSV, analysed in the browser.
+
+Gallery images (3:2, real screenshots of the app) are in [`docs/gallery/`](docs/gallery/).
 
 ## Run it
 
