@@ -85,3 +85,19 @@ def tune(detector, returns, llr, break_day, grid):
     """Grid search for the threshold with the lowest mean regret. Returns (best, scores)."""
     s = score(run_kill_rule(detector, returns, llr, grid), returns, break_day)
     return float(np.asarray(grid)[np.argmin(s["mean_regret"])]), s
+
+
+def calibration(p_live, break_day, start=WARMUP, n_bins=10) -> list:
+    """Bin predicted p (series starting on day `start`) against whether that day was really broken."""
+    p_live = np.asarray(p_live, float)
+    days = start + np.arange(p_live.shape[1])
+    broken = (days[None, :] >= np.asarray(break_day)[:, None]).ravel()
+    p = p_live.ravel()
+    idx = np.minimum((p * n_bins).astype(int), n_bins - 1)
+    bins = []
+    for b in range(n_bins):
+        m = idx == b
+        bins.append({"lo": b / n_bins, "hi": (b + 1) / n_bins, "count": int(m.sum()),
+                     "mean_p": float(p[m].mean()) if m.any() else None,
+                     "frac_broken": float(broken[m].mean()) if m.any() else None})
+    return bins

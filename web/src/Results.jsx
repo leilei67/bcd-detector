@@ -24,6 +24,7 @@ function Tip({ active, payload, lines }) {
 export function Tradeoff({ res, hazard, tEff }) {
   const curve = res.tradeoff[hazard].map((d) => ({ ...d, slow: 100 * d.slow_cost }));
   const cur = nearestPoint(curve, tEff);
+  const offGrid = tEff > curve[curve.length - 1].T; // T_eff above the highest swept T (can exceed 1)
   const nBroken = (2 / 3) * res.config.test.n;
   return (
     <section>
@@ -40,11 +41,12 @@ export function Tradeoff({ res, hazard, tEff }) {
             `slow-kill cost ${d.slow.toFixed(2)}%`, `mean regret ${pct(d.mean_regret)}`]} />} />
           <Scatter data={curve} fill={C.bayes} line={{ stroke: C.bayes, strokeWidth: 2 }} isAnimationActive={false} />
           <ReferenceDot x={cur.false_kills} y={cur.slow} r={11} fill="none" stroke={C.ink} strokeWidth={3}
-            label={{ value: `T_eff ≈ ${cur.T}`, position: "right", fontSize: 16, fill: C.ink, offset: 14 }} />
+            label={{ value: offGrid ? `T_eff = ${tEff.toFixed(2)}: never kills` : `T_eff ≈ ${cur.T}`, position: "right", fontSize: 16, fill: C.ink, offset: 14 }} />
         </ScatterChart>
       </ResponsiveContainer>
       <p className="note">
-        At T_eff ≈ {cur.T} (hazard {hazard}y): {cur.false_kills} false kills, {cur.slow.toFixed(1)}% lost per broken strategy
+        {offGrid && <>T_eff = {tEff.toFixed(2)} is above every swept kill line, so p can never reach it; the marker shows the highest one, T = {cur.T}. </>}
+        At T ≈ {cur.T} (hazard {hazard}y): {cur.false_kills} false kills, {cur.slow.toFixed(1)}% lost per broken strategy
         ({Math.round(nBroken)} broken) before the kill, mean regret {pct(cur.mean_regret)}. False kill = fired on a healthy strategy or before its break.
       </p>
     </section>
@@ -54,7 +56,8 @@ export function Tradeoff({ res, hazard, tEff }) {
 export function Scoreboard({ res }) {
   const board = res.scoreboard;
   const best = board[0];
-  const bayesWon = best.rule.startsWith("bayes");
+  const tunedBayes = board.find((r) => r.rule === `bayes_${res.config.default_hazard}y`);
+  const bayesWon = best === tunedBayes;
   const clear = board.filter((r) => r !== best && r.gap_vs_best > 2 * r.gap_se);
   const tied = board.filter((r) => r !== best && r.gap_vs_best <= 2 * r.gap_se);
   return (
@@ -65,7 +68,7 @@ export function Scoreboard({ res }) {
         (seed {res.config.test.seed}); regret is profit lost against an oracle that stops exactly at the true break.
       </p>
       <p className="verdict">
-        {bayesWon ? <><b>{best.label}</b> has the lowest test regret.</> : <><b>The tuned Bayesian rule did not win on the test set:</b> {best.label} did.</>}{" "}
+        {bayesWon ? <><b>{best.label}</b> has the lowest test regret.</> : <><b>The tuned Bayesian rule ({tunedBayes.label}) did not win on the test set:</b> {best.label} did.</>}{" "}
         {clear.length > 0 && <>Clearly better than {clear.map((r) => r.label).join(", ")}. </>}
         {tied.length > 0 && <>Within noise (gap under 2 standard errors) of {tied.map((r) => r.label).join(", ")}.</>}
       </p>

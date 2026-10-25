@@ -44,3 +44,15 @@ def test_drawdown_rule_uses_each_strategys_sigma():
     r = run_kill_rule(Drawdown(np.array([1.0, 2.0])), returns, np.zeros((2, 3)),
                       thresholds=[2.0], start=0, redeploy=5)
     assert r.fired[0, :, 1].tolist() == [True, False]
+
+
+def test_calibration_aligns_live_p_with_true_break_days():
+    from core.evaluate import calibration
+
+    # p covers days 2-3 only (start=2). Strategy 0 breaks on day 3, strategy 1 never (break=4).
+    p = np.array([[0.05, 0.95], [0.05, 0.15]])
+    bins = calibration(p, break_day=np.array([3, 4]), start=2)
+    assert bins[0]["count"] == 2 and bins[0]["frac_broken"] == 0.0
+    assert bins[1]["count"] == 1 and bins[1]["frac_broken"] == 0.0
+    assert bins[9]["count"] == 1 and bins[9]["frac_broken"] == 1.0
+    assert bins[5]["count"] == 0 and bins[5]["mean_p"] is None

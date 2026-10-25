@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from core.detectors import Bayes, Cusum, Drawdown, run_series
-from core.evaluate import REDEPLOY, run_kill_rule, score, tune
+from core.evaluate import REDEPLOY, calibration, run_kill_rule, score, tune
 from core.model import K_BROKEN, fit_baseline, log_likelihood_ratio
 from core.sim import N_DAYS, WARMUP, demo_strategy, simulate
 
@@ -47,20 +47,6 @@ def row(name, threshold, s, i=0):
             "mean_slow_cost": pick("mean_slow_cost")}
 
 
-def calibration(p, s):
-    days = np.arange(N_DAYS)[WARMUP:]
-    broken = (days[None, :] >= s.break_day[:, None]).ravel()
-    p = p[:, WARMUP:].ravel()
-    idx = np.minimum((p * 10).astype(int), 9)
-    bins = []
-    for b in range(10):
-        m = idx == b
-        bins.append({"lo": b / 10, "hi": (b + 1) / 10, "count": int(m.sum()),
-                     "mean_p": float(p[m].mean()) if m.any() else None,
-                     "frac_broken": float(broken[m].mean()) if m.any() else None})
-    return bins
-
-
 def main():
     train, train_llr, train_sigma = prepare(300, seed=1)
     test, test_llr, test_sigma = prepare(300, seed=2)
@@ -92,7 +78,9 @@ def main():
         tradeoff[str(y)] = [{"T": float(t), "false_kills": int(s["false_kills"][i]),
                              "slow_cost": float(s["mean_slow_cost"][i]),
                              "mean_regret": float(s["mean_regret"][i])} for i, t in enumerate(T_GRID)]
-        calib[str(y)] = calibration(run_series(Bayes(y), test.returns, test_llr), test)
+        # p starts at 0 on the first live day, exactly as the kill rule and the demo see it
+        live_p = run_series(Bayes(y), test.returns[:, WARMUP:], test_llr[:, WARMUP:])
+        calib[str(y)] = calibration(live_p, test.break_day)
 
     r = demo_strategy()
     base = fit_baseline(r[:WARMUP])
