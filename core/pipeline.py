@@ -138,5 +138,6 @@ def analyse_csv(text: str, name: str = "Uploaded strategy") -> dict:
         dates, returns = parse_returns_csv(text)
     except CsvError as e:
         return {"errors": e.messages}
-    caption = f"{name}: {dates[0]} to {dates[-1]}, {len(dates)} trading days; first {WARMUP} days used as the healthy warm-up."
-    return analyse(returns, dates, name=name, caption=caption)
+    caption = (f"Your upload ({name}): {dates[0]} to {dates[-1]}, {len(dates)} trading days; "
+               f"the first {WARMUP} are the warm-up the tool learns 'normal' from.")
+    return analyse(returns, dates, name=f"{name}: {dates[0][:4]}–{dates[-1][:4]}", caption=caption)

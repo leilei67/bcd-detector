@@ -86,13 +86,13 @@ The files are in percent. `core/french.py` converts them to decimals, and fails 
 
 | Dataset | Window | Warm-up fitted mean (a day) | Test-set winner | First fires on the real series |
 |---|---|---|---|---|
-| Simulated demo strategy | days 0–749 | +0.153 % | Bayesian (hazard 1y) | Bayes 2y day 547; CUSUM day 550; drawdown day 547 (true break: day 450) |
-| Momentum: 2009 crash | 2007-01-11 – 2009-12-31 | +0.121 % | Bayesian (hazard 2y) | Bayes 2y 2009-01-02; CUSUM 2009-01-05; drawdown 2008-01-23 |
-| Momentum: 2020 vaccine-news day | 2018-01-10 – 2020-12-31 | +0.049 % | Drawdown depth | Bayes 2y never; CUSUM never; drawdown 2019-09-10 |
-| Value: 2018–2020 slump | 2018-01-10 – 2020-12-31 | −0.071 % | no recommendation (warm-up has no edge) | – |
-| Momentum: latest | 2023-09-05 – 2026-08-31 | +0.062 % | Drawdown depth | Bayes 2y never; CUSUM 2026-08-28; drawdown 2026-08-10 |
-| Value: latest | 2023-09-05 – 2026-08-31 | −0.003 % | no recommendation (warm-up has no edge) | – |
-| US market: latest | 2023-09-05 – 2026-08-31 | +0.094 % | Drawdown depth | Bayes 2y never; CUSUM never; drawdown 2025-04-03 |
+| Simulated: 750 days | days 0–749 | +0.153 % | Bayesian (hazard 1y) | Bayes 2y day 547; CUSUM day 550; drawdown day 547 (true break: day 450) |
+| Momentum: 2007–2009 (2009 crash) | 2007-01-11 – 2009-12-31 | +0.121 % | Bayesian (hazard 2y) | Bayes 2y 2009-01-02; CUSUM 2009-01-05; drawdown 2008-01-23 |
+| Momentum: 2018–2020 (2020 vaccine-news day) | 2018-01-10 – 2020-12-31 | +0.049 % | Drawdown depth | Bayes 2y never; CUSUM never; drawdown 2019-09-10 |
+| Value: 2018–2020 (value slump) | 2018-01-10 – 2020-12-31 | −0.071 % | no recommendation (warm-up has no edge) | – |
+| Momentum: 2023–2026 (latest) | 2023-09-05 – 2026-08-31 | +0.062 % | Drawdown depth | Bayes 2y never; CUSUM 2026-08-28; drawdown 2026-08-10 |
+| Value: 2023–2026 (latest) | 2023-09-05 – 2026-08-31 | −0.003 % | no recommendation (warm-up has no edge) | – |
+| US market: 2023–2026 (latest) | 2023-09-05 – 2026-08-31 | +0.094 % | Drawdown depth | Bayes 2y never; CUSUM never; drawdown 2025-04-03 |
 
 What the new datasets show:
 - **Momentum, 2020.** The vaccine-news day (9 Nov 2020, −14.4 %) is momentum's worst day of 2020. The heavy-tailed model treats one day like that as a tail event, not proof of a break, so the Bayesian rule and CUSUM never fire. Drawdown fires earlier, on 2019-09-10.
@@ -147,6 +147,7 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
   - Momentum's −14.4 % on 2020-11-09 is its worst day of 2020.
   - Value fell 11.0 % in 2018, 8.3 % in 2019 and 33 % in 2020 (calendar-year sums of daily returns).
 - **Datasets with no edge are kept.** Value 2018–2020 and Value latest show "No recommendation" rather than having their windows moved.
+- **Picker.** Rows are strategies and buttons are timeframes, so every choice reads "Strategy: timeframe". Small text under each button names the episode. The last row, "Your own", holds the returns upload and a "Test a trading rule" button, which only shows a work-in-progress note.
 - **"US market" means Mkt-RF,** the excess return over T-bills, not the total return.
 - **Default "as of" day.** Day 540 for the simulated demo, so the risk slider visibly flips the recommendation. The last day for real and uploaded data.
 - **CSV rules.**
@@ -176,6 +177,7 @@ All three detectors share one vectorised one-day step (`core/detectors.py`). The
 - **Decision journal.** Nothing records what was recommended and what the trader did.
 - **Bands.** The keep / investigate / reduce bands are a heuristic. Only the kill line T is tuned.
 - **Offline uploads.** Uploading needs internet the first time, to download Pyodide. Vendoring Pyodide into the build would fix this, at about 30 MB.
+- **Trading rules.** The "Test a trading rule" button is a placeholder: describing a rule and backtesting it is not built.
 - **Other upload formats.** There is no upload of prices, equity curves or trade logs. Only daily returns are accepted.
 
 ## Review notes

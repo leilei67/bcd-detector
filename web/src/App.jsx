@@ -43,37 +43,50 @@ export default function App() {
   if (error) return <main><p>Could not load the datasets ({error}). Run <code>uv run python -m core.run</code> first.</p></main>;
   if (!index) return <main><p>Loading…</p></main>;
   const res = cache[current];
-  const choices = [...index, ...(cache.upload ? [{ id: "upload", name: cache.upload.dataset.name, group: "Your upload" }] : [])];
-  const groups = [...new Set(choices.map((d) => d.group))];
+  const rows = [...new Set(index.map((d) => d.strategy))];
   return (
     <main>
       <h1>Broken, or just a bad run?</h1>
       <p className="sub">A kill-switch adviser for a solo trader's strategy.</p>
       <section>
         <h2>Choose a strategy</h2>
-        <p className="caption">A simulated example, real factor returns from famous episodes and from the latest data, or your own daily returns.</p>
-        {groups.map((g) => (
-          <div key={g} className="picker-group">
-            <div className="picker-label">{g}</div>
-            <div className="seg" style={{ flexWrap: "wrap" }}>
-              {choices.filter((d) => d.group === g).map((d) => (
-                <button key={d.id} aria-pressed={current === d.id} onClick={() => setCurrent(d.id)}>{d.name}</button>
-              ))}
-            </div>
-          </div>
-        ))}
-        <Upload onResult={onUpload} />
+        <p className="caption">
+          Each row is a strategy and each button a timeframe, so every choice reads <b>Strategy: timeframe</b>.
+          The real rows are Kenneth French's daily factor returns; the small text names the episode.
+        </p>
+        <div className="picker">
+          <div className="picker-head">Strategy</div>
+          <div className="picker-head">Timeframe</div>
+          {rows.map((strategy) => (
+            <React.Fragment key={strategy}>
+              <div className="picker-label">{strategy}</div>
+              <div className="seg">
+                {index.filter((d) => d.strategy === strategy).map((d) => (
+                  <button key={d.id} aria-pressed={current === d.id} aria-label={`${d.name} (${d.note})`}
+                    onClick={() => setCurrent(d.id)}>
+                    <span>{d.timeframe}</span><span className="btn-note">{d.note}</span>
+                  </button>
+                ))}
+              </div>
+            </React.Fragment>
+          ))}
+          <div className="picker-label">Your own</div>
+          <OwnStrategy uploaded={cache.upload} selected={current === "upload"}
+            onSelect={() => setCurrent("upload")} onResult={onUpload} />
+        </div>
       </section>
       {res ? <Demo key={current === "upload" ? `upload-${uploads}` : current} res={res} /> : <p>Loading…</p>}
     </main>
   );
 }
 
-function Upload({ onResult }) {
+// The "Your own" picker row: upload daily returns (works), or test a trading rule (work in progress).
+function OwnStrategy({ uploaded, selected, onSelect, onResult }) {
   const worker = useRef(null);
   const [status, setStatus] = useState(null);
   const [errors, setErrors] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [showWip, setShowWip] = useState(false);
 
   const run = async (file) => {
     if (!file) return;
@@ -92,22 +105,47 @@ function Upload({ onResult }) {
     worker.current.postMessage({ text: await file.text(), name: file.name.replace(/\.csv$/i, "") });
   };
 
+  const dates = uploaded?.demo.dates;
   return (
-    <div style={{ marginTop: 14 }}>
-      <label htmlFor="csv" style={{ fontWeight: 600 }}>Upload a CSV with columns <code>date, return</code> (YYYY-MM-DD, daily returns as decimals: 1% = 0.01)</label>
-      <div>
-        <input id="csv" type="file" accept=".csv,text/csv" disabled={busy}
-          onChange={(e) => run(e.target.files[0])} style={{ font: "inherit", marginTop: 6 }} />
+    <>
+      <div className="seg">
+        <input id="csv" className="visually-hidden" type="file" accept=".csv,text/csv" disabled={busy}
+          onChange={(e) => { run(e.target.files[0]); e.target.value = ""; }} />
+        <label htmlFor="csv" className="btn" aria-disabled={busy}>
+          <span>{busy ? "Analysing…" : "Upload daily returns"}</span><span className="btn-note">CSV: date, return</span>
+        </label>
+        {uploaded && (
+          <button aria-pressed={selected} onClick={onSelect}>
+            <span>{dates[0].slice(0, 4)}–{dates[dates.length - 1].slice(0, 4)}</span>
+            <span className="btn-note">your upload</span>
+          </button>
+        )}
+        <button aria-expanded={showWip} onClick={() => setShowWip((v) => !v)}>
+          <span>Test a trading rule</span><span className="btn-note">work in progress</span>
+        </button>
       </div>
-      {status && <p className="note" role="status">{status}</p>}
-      {errors.length > 0 && (
-        <div className="problems" role="alert">
-          <b>This file can't be analysed yet:</b>
-          <ul>{errors.map((m) => <li key={m}>{m}</li>)}</ul>
-        </div>
-      )}
-      <p className="note">Runs the same Python as the bundled examples, in your browser via Pyodide. The first upload downloads Python (about 30 MB, needs internet); the analysis takes a few seconds. Nothing leaves your machine.</p>
-    </div>
+      <div className="picker-wide">
+        {showWip && (
+          <p className="wip" role="status">
+            <b>Work in progress.</b> Soon you'll describe a trading rule (for example, "hold the market when its 50-day
+            average is above its 200-day") and we'll backtest it, then run the detectors on the result. For now, export
+            your strategy's daily returns and upload them as a CSV.
+          </p>
+        )}
+        {status && <p className="note" role="status">{status}</p>}
+        {errors.length > 0 && (
+          <div className="problems" role="alert">
+            <b>This file can't be analysed yet:</b>
+            <ul>{errors.map((m) => <li key={m}>{m}</li>)}</ul>
+          </div>
+        )}
+        <p className="note">
+          Upload a CSV with columns <code>date, return</code>: dates as YYYY-MM-DD, returns as decimals (1% = 0.01).
+          It runs the same Python as the examples, in your browser; the first upload downloads Python (about 30 MB,
+          needs internet). Nothing leaves your machine.
+        </p>
+      </div>
+    </>
   );
 }
 

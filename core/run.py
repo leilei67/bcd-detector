@@ -22,28 +22,35 @@ def caption(ds, dates):
             "never on these returns. Source: Kenneth R. French Data Library.")
 
 
+def timeframe(dates):
+    return f"{dates[0][:4]}–{dates[-1][:4]}"
+
+
 def build():
+    """Returns {id: results} and {id: picker entry}; every name reads "Strategy: timeframe"."""
     datasets = {"sim": analyse(
-        demo_strategy(), sim_params=(MU, SCALE, NU), name="Simulated demo strategy",
+        demo_strategy(), sim_params=(MU, SCALE, NU), name="Simulated: 750 days",
         caption="A simulated strategy, healthy for 450 days, then its edge flips negative.",
         break_day=450, default_day=540)}
-    groups = {"sim": "Simulated"}
-    for ds in REAL:
+    picker = {"sim": {"strategy": "Simulated", "timeframe": "750 days", "note": "break at day 450"}}
+    # Rows appear in this order; real windows run oldest first within a row.
+    for ds in sorted(REAL, key=lambda d: (d["strategy"] != "Momentum", d["strategy"] != "Value", d["end"] or "9999")):
         dates, returns = parse_returns_csv((ROOT / "data" / f"{ds['id']}.csv").read_text())
-        datasets[ds["id"]] = analyse(returns, dates, name=ds["name"], caption=caption(ds, dates))
-        groups[ds["id"]] = ds["group"]
-    return datasets, groups
+        name = f"{ds['strategy']}: {timeframe(dates)}"
+        datasets[ds["id"]] = analyse(returns, dates, name=name, caption=caption(ds, dates))
+        picker[ds["id"]] = {"strategy": ds["strategy"], "timeframe": timeframe(dates), "note": ds["note"]}
+    return datasets, picker
 
 
 def main():
-    datasets, groups = build()
+    datasets, picker = build()
     OUT.mkdir(parents=True, exist_ok=True)
     for old in OUT.glob("*.json"):
         old.unlink()  # drop datasets no longer in the registry
     for key, res in datasets.items():
         (OUT / f"{key}.json").write_text(json.dumps(res, allow_nan=False))
         print_board(res)
-    index = [{"id": k, "name": v["dataset"]["name"], "group": groups[k], "file": f"datasets/{k}.json"}
+    index = [{"id": k, "name": v["dataset"]["name"], **picker[k], "file": f"datasets/{k}.json"}
              for k, v in datasets.items()]
     (OUT / "index.json").write_text(json.dumps(index))
     print(f"wrote {OUT}")
